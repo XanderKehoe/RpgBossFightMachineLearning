@@ -1,0 +1,15 @@
+.vsconfig
+
+*.csproj
+*.sln
+*.meta
+
+.vs/*
+venv/*
+UserSettings/*
+ProjectSettings/*
+Packages/*
+obj/*
+Logs/*
+Library/*
+

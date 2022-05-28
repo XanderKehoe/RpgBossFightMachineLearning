@@ -1,0 +1,65 @@
+{
+    "AbilityChoose": {
+        "checkpoints": [
+            {
+                "steps": 2999981,
+                "file_path": "results\\Test1\\AbilityChoose\\AbilityChoose-2999981.onnx",
+                "reward": 44.722734451293945,
+                "creation_time": 1653609504.9223125,
+                "auxillary_file_paths": [
+                    "results\\Test1\\AbilityChoose\\AbilityChoose-2999981.pt"
+                ]
+            },
+            {
+                "steps": 3499980,
+                "file_path": "results\\Test1\\AbilityChoose\\AbilityChoose-3499980.onnx",
+                "reward": 46.96886322297246,
+                "creation_time": 1653613628.6988301,
+                "auxillary_file_paths": [
+                    "results\\Test1\\AbilityChoose\\AbilityChoose-3499980.pt"
+                ]
+            },
+            {
+                "steps": 3999981,
+                "file_path": "results\\Test1\\AbilityChoose\\AbilityChoose-3999981.onnx",
+                "reward": 48.970152774703834,
+                "creation_time": 1653616425.7467113,
+                "auxillary_file_paths": [
+                    "results\\Test1\\AbilityChoose\\AbilityChoose-3999981.pt"
+                ]
+            },
+            {
+                "steps": 4499961,
+                "file_path": "results\\Test1\\AbilityChoose\\AbilityChoose-4499961.onnx",
+                "reward": 43.677575864289935,
+                "creation_time": 1653619280.8202212,
+                "auxillary_file_paths": [
+                    "results\\Test1\\AbilityChoose\\AbilityChoose-4499961.pt"
+                ]
+            },
+            {
+                "steps": 4594908,
+                "file_path": "results\\Test1\\AbilityChoose\\AbilityChoose-4594908.onnx",
+                "reward": 48.78094905033344,
+                "creation_time": 1653619914.9215238,
+                "auxillary_file_paths": [
+                    "results\\Test1\\AbilityChoose\\AbilityChoose-4594908.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 4594908,
+            "file_path": "results\\Test1\\AbilityChoose.onnx",
+            "reward": 48.78094905033344,
+            "creation_time": 1653619914.9215238,
+            "auxillary_file_paths": [
+                "results\\Test1\\AbilityChoose\\AbilityChoose-4594908.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "0.29.0",
+        "torch_version": "1.11.0+cu115"
+    }
+}

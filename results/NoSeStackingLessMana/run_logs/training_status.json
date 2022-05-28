@@ -1,0 +1,65 @@
+{
+    "AbilityChoose": {
+        "checkpoints": [
+            {
+                "steps": 8999943,
+                "file_path": "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-8999943.onnx",
+                "reward": 8.511110734481077,
+                "creation_time": 1653698598.654785,
+                "auxillary_file_paths": [
+                    "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-8999943.pt"
+                ]
+            },
+            {
+                "steps": 9499961,
+                "file_path": "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-9499961.onnx",
+                "reward": 10.201716314469065,
+                "creation_time": 1653706932.5967906,
+                "auxillary_file_paths": [
+                    "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-9499961.pt"
+                ]
+            },
+            {
+                "steps": 9999968,
+                "file_path": "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-9999968.onnx",
+                "reward": 6.529584538936615,
+                "creation_time": 1653709212.7405224,
+                "auxillary_file_paths": [
+                    "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-9999968.pt"
+                ]
+            },
+            {
+                "steps": 10499990,
+                "file_path": "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-10499990.onnx",
+                "reward": 12.240807545346183,
+                "creation_time": 1653745739.7369998,
+                "auxillary_file_paths": [
+                    "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-10499990.pt"
+                ]
+            },
+            {
+                "steps": 10935687,
+                "file_path": "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-10935687.onnx",
+                "reward": 7.669578656554222,
+                "creation_time": 1653747806.0594437,
+                "auxillary_file_paths": [
+                    "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-10935687.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 10935687,
+            "file_path": "results\\NoSeStackingLessMana\\AbilityChoose.onnx",
+            "reward": 7.669578656554222,
+            "creation_time": 1653747806.0594437,
+            "auxillary_file_paths": [
+                "results\\NoSeStackingLessMana\\AbilityChoose\\AbilityChoose-10935687.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "0.29.0",
+        "torch_version": "1.11.0+cu115"
+    }
+}
