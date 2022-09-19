@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class Entity : MonoBehaviour
+public abstract class Entity : MonoBehaviour
 {
-    public GameManager gameManager;
+    public SimulationManager simulationManager;
     public GameObject simulation;
     public Animator animator;
 
@@ -14,13 +14,11 @@ public class Entity : MonoBehaviour
 
     public Stats stats;
 
-    protected bool globalCooldownEnabled = false;
-
-    protected List<Ability> abilities = new();
+    public List<Ability> abilities { get; protected set; } = new();
     private List<string> lockedAnimations = new(); // this is for controlling animations to not be rapidly repeated.
     private const float LOCKED_ANIMATION_TIME = 8f;
 
-    [SerializeField] private List<StatusEffect> currentStatusEffects = new();
+    [SerializeField] public List<StatusEffect> currentStatusEffects = new(); // treat as public get private set, need to keep public to view in editor.
 
     public ushort teamNumber;
     protected List<Entity> teammates = new();
@@ -29,7 +27,7 @@ public class Entity : MonoBehaviour
 
     public float meleeRangeRadius = 1f; // how close do hostiles have to be to melee this entity
 
-    static readonly float PASSIVE_HEALTH_REGEN = 5f;
+    static readonly float PASSIVE_HEALTH_REGEN = 1.25f;
     static readonly float PASSIVE_MANA_REGEN = 10f;
 
     public bool isDead = false;
@@ -38,6 +36,9 @@ public class Entity : MonoBehaviour
 
     public Vector3 startPos;
     public Quaternion startRot;
+
+    protected bool globalCooldownEnabled = false;
+    private Coroutine globalCooldownCoroutine = null;
 
     // Start is called before the first frame update
     public virtual void Start()
@@ -63,7 +64,7 @@ public class Entity : MonoBehaviour
             Debug.LogError("(" + simulation.name + ") " + name + ": no initial target is set");
         }
 
-        if (gameManager == null)
+        if (simulationManager == null)
         {
             Debug.LogError("(" + simulation.name + ") " + name + ": no gameManager is set");
         }
@@ -81,14 +82,14 @@ public class Entity : MonoBehaviour
         InvokeRepeating("UpdatePerSecond", 1, 1);
 
         if (this is Character)
-            teammates = gameManager.GetTeamMembers((Character) this);
+            teammates = simulationManager.GetTeamMembers((Character) this);
 
         startPos = transform.position;
         startRot = transform.rotation;
     }
 
     // Update is called once per frame
-    void Update()
+    public virtual void Update()
     {
         if (!isDead)
         {
@@ -102,7 +103,7 @@ public class Entity : MonoBehaviour
                     if (facingDir.x != 0 || facingDir.z != 0) // this is here to get rid of annoying warnings.
                     {
                         Quaternion rotation = Quaternion.LookRotation(facingDir);
-                        transform.rotation = Quaternion.Lerp(transform.rotation, rotation, 1f * Time.deltaTime);
+                        transform.rotation = Quaternion.Lerp(transform.rotation, rotation, 4f * Time.deltaTime);
                     }
                 }
             }
@@ -120,11 +121,20 @@ public class Entity : MonoBehaviour
 
                     currentTarget = null;
                     return;
+                } 
+                else if (this is PlainAI)
+                {
+                    if (Vector3.Distance(currentTarget.transform.position, navMeshAgent.destination) > 1f) // update destination if significant difference between current destination and target's position
+                    {
+                        //Debug.Log(name + ": setting new navmeshagent destination.");
+                        navMeshAgent.SetDestination(currentTarget.transform.position
+                            + (Vector3.Normalize(transform.position - currentTarget.transform.position) * currentTarget.meleeRangeRadius));
+                    }
                 }
             }
             else if (this is PlainAI)
             {
-                // switch target logic should go here
+                // threat generation logic starts here
                 PlainAI castedThis = (PlainAI) this;
 
                 //Debug.Log(name + ": Searching for new target");
@@ -146,7 +156,7 @@ public class Entity : MonoBehaviour
                 {
                     // still no new target (all characters must be dead?)
                     Debug.Log("("+simulation.name+")"+ name + ": no new target found, all characters are dead (RESET SCENE)");
-                    gameManager.CheckForEndOfEpisode(true);
+                    simulationManager.CheckForEndOfEpisode();
 
                     return;
                 }
@@ -158,12 +168,10 @@ public class Entity : MonoBehaviour
             {
                 MakeCombatDecision();
 
-                globalCooldownEnabled = true;
-
-                StartCoroutine(StartGlobalCooldownTimer(GetNextGlobalCooldownTimer()));
+                globalCooldownCoroutine = StartCoroutine(StartGlobalCooldownTimer(GetNextGlobalCooldownTimer()));
             }
 
-            if (!navMeshAgent.isStopped)
+            /*if (!navMeshAgent.isStopped)
             {
                 bool stop = false;
                 if (this is Character)
@@ -177,7 +185,7 @@ public class Entity : MonoBehaviour
                     navMeshAgent.isStopped = true;
                 else
                     navMeshAgent.SetDestination(currentTarget.transform.position);
-            }
+            } */
 
             FaceTarget();
         }
@@ -188,6 +196,7 @@ public class Entity : MonoBehaviour
     {
         if (!isDead)
         {
+            // handle stat regen and status effects
             float healthRegenAmount = PASSIVE_HEALTH_REGEN;
             float manaRegenAmount = PASSIVE_MANA_REGEN;
             float animationAttackSpeedModifier = 1f;
@@ -217,15 +226,35 @@ public class Entity : MonoBehaviour
             if (healthRegenAmount >= 0)
                 RestoreHealth(healthRegenAmount);
             else
-                CalculateAndTakeDamageFromAbility(this, AbilityName.UPDATE_PER_SECOND, healthRegenAmount);
+                CalculateAndTakeDamageFromAbility(this, new UpdateAbility(healthRegenAmount * -1), true);
+
             RestoreMana(manaRegenAmount);
 
             navMeshAgent.speed = stats.baseMoveSpeed * animationMoveSpeedModifier;
 
+            // handle animation speed modification & other character specific updates.
             if (this is Character)
             {
                 animator.SetFloat("attackSpeedModifier", Mathf.Pow(animationAttackSpeedModifier, 1.5f));
                 animator.SetFloat("movementSpeedModifier", animationMoveSpeedModifier);
+
+                Vector3 dragonForwardVector = mlAgentsController.dragon.transform.forward;
+                Vector3 vectorToThis = Vector3.Normalize(transform.position - mlAgentsController.dragon.transform.position);
+
+                /*
+                // All characters but the paladin should not be in the dragon's flame breath's angle, this should help guide them to learn that.
+                if (!(this is Paladin)) 
+                {
+                    if (!(MathHelper.IsAngleBetweenTwoVectorsLessThan(dragonForwardVector, vectorToThis, Dragon.FLAME_BREATH_ANGLE)))
+                    {
+                        mlAgentsController.AddReward(MlAgentsController.REWARD_NOT_IN_FLAME_BREATH_ANGLE);
+                    }
+                    else
+                    {
+                        mlAgentsController.AddReward(MlAgentsController.REWARD_NOT_IN_FLAME_BREATH_ANGLE * -1);
+                    }
+                }
+                */
             }
 
             foreach (StatusEffect statusEffect in toRemoveList)
@@ -236,10 +265,7 @@ public class Entity : MonoBehaviour
     }
 
     // returns true if global cooldown should be started
-    protected virtual void MakeCombatDecision()
-    {
-        Debug.LogError("(" + simulation.name + ") " + name + ": MakeCombatDecision - Called from base function, this is supposed to be overwritten!");
-    }
+    protected abstract void MakeCombatDecision();
 
     float GetNextGlobalCooldownTimer()
     {
@@ -256,8 +282,18 @@ public class Entity : MonoBehaviour
         return ret;
     }
 
+    public void ResetGlobalCooldownTimer()
+    {
+        if (globalCooldownCoroutine != null)
+        {
+            StopCoroutine(globalCooldownCoroutine);
+        }
+        globalCooldownEnabled = false;
+    }
+
     IEnumerator StartGlobalCooldownTimer(float time)
     {
+        globalCooldownEnabled = true;
         yield return new WaitForSeconds(time);
 
         globalCooldownEnabled = false;
@@ -303,6 +339,117 @@ public class Entity : MonoBehaviour
 
     protected void CastAbility(Entity target, Ability ability)
     {
+        List<Entity> GetAreaOfEffectTargets(List<Entity> potentialTargets, AbilityName abilityName, float range = float.PositiveInfinity)
+        {
+            List<Entity> retList = new();
+
+            foreach (Entity target in potentialTargets)
+            {
+                if (abilityName == AbilityName.FLAME_BREATH && Vector3.Distance(transform.position, target.transform.position) < range)
+                {
+                    Vector3 forwardVector = transform.forward;
+                    Vector3 vectorToTarget = Vector3.Normalize(target.transform.position - transform.position);
+
+                    if (MathHelper.IsAngleBetweenTwoVectorsLessThan(forwardVector, vectorToTarget, Dragon.FLAME_BREATH_ANGLE)) // less than x degree angle
+                    {
+                        retList.Add(target);
+                    }
+                }
+            }
+
+            return retList;
+        }
+
+        void ApplyStatusEffects(Ability ability, List<StatusEffect> clonedStatusEffects)
+        {
+            foreach (StatusEffect statusEffect in clonedStatusEffects)
+            {
+                statusEffect.afflictingAbilityName = ability.name;
+
+                switch (statusEffect.target)
+                {
+                    case StatusEffectTarget.Self:
+                        {
+                            this.ApplyNewStatusEffect(statusEffect);
+                            break;
+                        }
+
+                    case StatusEffectTarget.SelectedTarget:
+                        {
+                            if (target != null)
+                                target.ApplyNewStatusEffect(statusEffect);
+                            else
+                                Debug.LogError("(" + simulation.name + ") " + name + ": CastAbility - target in SelectedTarget case is NULL");
+                            break;
+                        }
+
+                    case StatusEffectTarget.AllFriendlies:
+                        {
+                            if (ability.name != AbilityName.TRANSFER_MANA)
+                                this.ApplyNewStatusEffect(statusEffect);
+
+                            //Debug.Log(name + ": casting [" + statusEffect.type + "] to all teammates");
+
+                            foreach (Entity teammate in teammates)
+                            {
+                                //Debug.Log(name + ": giving statusEffect of type [" + statusEffect.type + "] to my teammeate - " + teammate.name);
+                                teammate.ApplyNewStatusEffect(statusEffect);
+                            }
+
+                            break;
+                        }
+
+                    case StatusEffectTarget.AllEnemies:
+                        {
+                            if (this is PlainAI)
+                            {
+                                PlainAI castedThis = (PlainAI)this;
+
+                                foreach (KeyValuePair<Entity, float> entry in castedThis.threatMap)
+                                {
+                                    entry.Key.ApplyNewStatusEffect(statusEffect);
+                                }
+                            }
+                            else
+                            {
+                                Debug.LogWarning(name + ": Casted [" + ability.name + "] which has an 'AllEnemies' target type, but this is unhandled for non-PlainAI types");
+                            }
+
+                            break;
+                        }
+
+                    case StatusEffectTarget.AreaOfEffect:
+                        {
+                            if (this is PlainAI)
+                            {
+                                PlainAI castedThis = (PlainAI)this;
+
+                                List<Entity> potentialTargets = new();
+                                foreach (KeyValuePair<Entity, float> entry in castedThis.threatMap)
+                                {
+                                    potentialTargets.Add(entry.Key);
+                                }
+
+                                List<Entity> targets = GetAreaOfEffectTargets(potentialTargets, ability.name, ability.range);
+                                foreach (Entity AoeTarget in targets)
+                                {
+                                    AoeTarget.ApplyNewStatusEffect(statusEffect);
+                                }
+                            }
+
+                            break;
+                        }
+
+                    default:
+                        {
+                            Debug.LogError("(" + simulation.name + ") " + name + ": CastAbility - unhandled StatusEffectTarget of: " + statusEffect.target.ToString());
+                            break;
+                        }
+                }
+            }
+        }
+
+        // check mana cost and update it.
         if (ability is CharacterAbility)
         {
             CharacterAbility castedAbility = (CharacterAbility) ability;
@@ -315,301 +462,32 @@ public class Entity : MonoBehaviour
                 stats.mana -= castedAbility.manaCost;
         }
 
-        Ability clonedAbility = ability.Clone();
+        target.CalculateAndTakeDamageFromAbility(this, ability);
 
-        target.CalculateAndTakeDamageFromAbility(this, clonedAbility.name, clonedAbility.damage);
+        // apply status effects to proper targets
+        List<StatusEffect> clonedStatusEffects = ability.GetStatusEffectListClone();
+        ApplyStatusEffects(ability, clonedStatusEffects);
 
-        foreach (StatusEffect statusEffect in clonedAbility.statusEffects)
-        {
-            statusEffect.afflictingAbilityName = ability.name;
-
-            switch (statusEffect.target)
-            {
-                case StatusEffectTarget.Self:
-                    {
-                        this.ApplyNewStatusEffect(statusEffect);
-                        break;
-                    }
-
-                case StatusEffectTarget.SelectedTarget:
-                    {
-                        if (target != null)
-                            target.ApplyNewStatusEffect(statusEffect);
-                        else
-                            Debug.LogError("(" + simulation.name + ") " + name + ": CastAbility - target in SelectedTarget case is NULL");
-                        break;
-                    }
-
-                case StatusEffectTarget.AllFriendlies:
-                    {
-                        this.ApplyNewStatusEffect(statusEffect);
-
-                        //Debug.Log(name + ": casting [" + statusEffect.type + "] to all teammates");
-
-                        foreach (Entity teammate in teammates)
-                        {
-                            //Debug.Log(name + ": giving statusEffect of type [" + statusEffect.type + "] to my teammeate - " + teammate.name);
-                            teammate.ApplyNewStatusEffect(statusEffect);
-                        }
-
-                        break;
-                    }
-
-                /*case StatusEffectTarget.AllEnemies:
-                    {
-                        Debug.LogError(name + ": CastAbility - unhandled StatusEffectTarget of: " + statusEffect.target.ToString());
-
-                        break;
-                    }*/
-
-                default:
-                    {
-                        Debug.LogError("(" + simulation.name + ") " + name + ": CastAbility - unhandled StatusEffectTarget of: " + statusEffect.target.ToString());
-                        break;
-                    }
-            }
-        }
-
-        if (this is Character)
-        {
-            switch (ability.animationType)
-            {
-                case Ability.AnimationType.MeleeAttack1:
-                    animator.CrossFade("MeleeAttack1", 0.1f);
-                    break;
-                case Ability.AnimationType.MeleeAttack2:
-                    animator.CrossFade("MeleeAttack2", 0.1f);
-                    break;
-                case Ability.AnimationType.CastSpell:
-                    animator.CrossFade("CastSpell", 0.1f);
-                    break;
-                case Ability.AnimationType.CastHeal:
-                    animator.CrossFade("CastHeal", 0.1f);
-                    break;
-                case Ability.AnimationType.ShootArrow:
-                    animator.CrossFade("ShootArrow", 0.1f);
-                    break;
-
-                default:
-                    Debug.LogWarning("(" + simulation.name + ") " + name + ": CastAbility - no matching case for AnimationType [" + ability.animationType.ToString() + "]");
-                    break;
-            }
-        }
-        else if (this is Dragon)
-        {
-            switch (ability.animationType)
-            {
-                case Ability.AnimationType.BasicAttack:
-                    animator.CrossFade("Basic Attack", 0.1f);
-                    break;
-
-                default:
-                    Debug.LogWarning("(" + simulation.name + ") " + name + ": CastAbility - no matching case for AnimationType [" + ability.animationType.ToString() + "]");
-                    break;
-            }
-        }
+        // perform a corresponding animation
+        string getAnimationName = ability.GetAnimationName();
+        animator.CrossFade(getAnimationName, 0.1f);
     }
 
-    // damageingEntity - the entity that is damaging this entity
-    public void CalculateAndTakeDamageFromAbility(Entity damagingEntity, AbilityName abilityName, float amount)
+    // damagingEntity - the entity that is damaging this entity
+    public void CalculateAndTakeDamageFromAbility(Entity damagingEntity, Ability ability, bool isUpdatePerSecond = false)
     {
-        if (amount == 0)
-            return;
-
-        //if (amount < 0)
-            //Debug.LogWarning(name + ": TakeDamage - negative value received and will heal target, if you want to heal, you should use HealDamage instead");
-
-        float getHitProbability = damagingEntity.stats.baseHitChance
-            + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.HitChanceOnTarget)
-            - this.GetTotalStatusEffectModifier(StatusEffectType.HitChanceOnSelf);
-        if (UnityEngine.Random.Range((float) 0, (float) 1) >= getHitProbability)
-        {
-            // this ability missed.
-            return;
-        }
-
-        // Check if attacking entity has any attack power modifers
-        float totalAttackPowerModifier = 1f + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.AttackPower);
-
-        // Handle special cases for each ability
-        foreach (StatusEffect statusEffect in currentStatusEffects)
-        {
-            switch (abilityName) 
-            {
-                // Hunter
-                case AbilityName.CHIMERA_SHOT:
-                {
-                    foreach (StatusEffect statusEffect2 in currentStatusEffects)
-                    {
-                        if (statusEffect2.afflictingAbilityName == AbilityName.SERPENT_STING)
-                        {
-                            statusEffect2.time = Hunter.SERPENT_STING_TIME;
-                        }
-                    }
-                    break;
-                }
-                case AbilityName.KILL_SHOT:
-                {
-                    float hpRatio = stats.health / stats.maxHealth;
-                    totalAttackPowerModifier += (1 - hpRatio);
-                    break;
-                }
-
-                // Death Knight
-                case AbilityName.SCOURGE_STRIKE:
-                case AbilityName.DEATH_STRIKE:
-                case AbilityName.OBLITERATE:
-                {
-                    uint diseaseCount = 0;
-                    foreach (StatusEffect statusEffect2 in currentStatusEffects)
-                    {
-                        if (statusEffect2.afflictingAbilityName == AbilityName.ICY_TOUCH || statusEffect2.afflictingAbilityName == AbilityName.PLAGUE_STRIKE)
-                        {
-                            diseaseCount++;
-                        }
-                    }
-
-                    switch (statusEffect.afflictingAbilityName) 
-                    {
-                        case AbilityName.SCOURGE_STRIKE:
-                        {
-                            totalAttackPowerModifier += 0.15f * diseaseCount;
-                            break;
-                        }
-                        case AbilityName.DEATH_STRIKE:
-                        {
-                            damagingEntity.RestoreHealth((0.1f * damagingEntity.stats.maxHealth) + (0.05f + diseaseCount));
-                            break;
-                        }
-                        case AbilityName.OBLITERATE:
-                        {
-                            totalAttackPowerModifier += 0.45f * diseaseCount;
-                            foreach (StatusEffect statusEffect2 in currentStatusEffects)
-                            {
-                                if (statusEffect2.afflictingAbilityName == AbilityName.ICY_TOUCH || statusEffect2.afflictingAbilityName == AbilityName.PLAGUE_STRIKE)
-                                {
-                                    statusEffect2.time = 0;
-                                }
-                            }
-                            break;
-                        }
-                    }
-
-                    break;
-                }
-            }
-        }
-
-        amount *= totalAttackPowerModifier;
-
-        // Check for critical strike
-        float doCriticalStrikeProbability = damagingEntity.stats.baseCritChance
-            + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.CriticalStrikeChanceOnTarget)
-            - this.GetTotalStatusEffectModifier(StatusEffectType.CriticalStrikeChanceOnSelf);
-        if (UnityEngine.Random.Range((float) 0, (float) 1) < doCriticalStrikeProbability)
-        {
-            // critical strike! do 50% more damage after other damage modifiers have been applied
-            if (this is Dragon)
-            {
-                string getHitAnimationName = "Get Hit";
-                if (!lockedAnimations.Contains(getHitAnimationName))
-                {
-                    animator.CrossFade(getHitAnimationName, 0.10f);
-                    lockedAnimations.Add(getHitAnimationName);
-                    //Debug.Log(name + ": Get Hit Animation Start");
-                    StartCoroutine(StartUnlockAnimationTimer(LOCKED_ANIMATION_TIME, getHitAnimationName));
-                }
-            }
-            amount *= 1.5f;
-        }
-
-        // Check for block
-        float doBlockProbability = this.stats.baseBlockChance + this.GetTotalStatusEffectModifier(StatusEffectType.BlockChance);
-        float randChance = UnityEngine.Random.Range((float) 0, (float) 1);
-        if (randChance < doBlockProbability)
-        {
-            //Debug.Log(name + ": Blocking! ["+ randChance+"] < ["+doBlockProbability+"]");
-            string blockAnimationName = "Block";
-            
-            if (this is Dragon && !lockedAnimations.Contains(blockAnimationName))
-            {
-                animator.CrossFade(blockAnimationName, 0.10f);
-                lockedAnimations.Add(blockAnimationName);
-                //Debug.Log(name + ": Block Animation Start");
-                StartCoroutine(StartUnlockAnimationTimer(LOCKED_ANIMATION_TIME, blockAnimationName));
-            }
-            else if (!(this is Dragon))
-                animator.CrossFade(blockAnimationName, 0.10f);
-
-            // Ability was blocked, reduce damage by 50%
-            amount *= 0.5f;
-        }
-
-        // Apply reward to character
-        if (damagingEntity is Character && this is Dragon)
-        {
-            Character castedCharacter = (Character) damagingEntity;
-            Dragon castedDragon = (Dragon) this;
-            castedCharacter.abilityChooser.AddReward((amount / castedDragon.stats.maxHealth) * MlAgentsController.REWARD_DAMAGE);
-        }
-
-        // Check for damage absorbtion from status effects
-        foreach (StatusEffect statusEffect in currentStatusEffects)
-        {
-            if (statusEffect.type == StatusEffectType.DamageAbsorption)
-            {
-                if (statusEffect.strength > amount)
-                {
-                    // absorbing all the remaining damage and still some left to spare
-                    statusEffect.strength -= amount;
-                    amount = 0;
-                    break;
-                }
-                else if (statusEffect.strength == amount)
-                {
-                    // absorbing all the remaining damage and none left to spare
-                    statusEffect.strength = 0;
-                    statusEffect.time = 0;
-                    amount = 0;
-                    break;
-                }
-                else
-                {
-                    // using all absorbtion from this effect, but not enough
-                    // will continue to try other status effects (if any) to absorb remaining damage
-                    statusEffect.strength = 0;
-                    statusEffect.time = 0;
-                    amount -= statusEffect.strength;
-                }
-            }
-        }
-
-        stats.health -= amount;
-        if (stats.health < 0)
-        {
-            // do death
-            isDead = true;
-            animator.CrossFade("Death", 0.15f);
-
-            // clear status effects
-            while (currentStatusEffects.Count > 0)
-                currentStatusEffects.RemoveAt(0);
-
-            if (this is Character)
-                mlAgentsController.AddReward(MlAgentsController.REWARD_CHARACTER_DEATH);
-        }
-        else if (this is PlainAI && damagingEntity != this)
+        void UpdateThreatMap(float damageAmount)
         {
             // Plain AI uses threat system to determine target, this block handles how threat is calculated.
-            PlainAI castedThis = (PlainAI) this;
+            PlainAI castedThis = (PlainAI)this;
             float threatModifier = 1f + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.ThreatGeneration);
             if (castedThis.threatMap.ContainsKey(damagingEntity))
             {
-                castedThis.threatMap[damagingEntity] += (amount * threatModifier);
+                castedThis.threatMap[damagingEntity] += (damageAmount * threatModifier);
             }
             else
             {
-                castedThis.threatMap.Add(damagingEntity, amount * threatModifier);
+                castedThis.threatMap.Add(damagingEntity, damageAmount * threatModifier);
             }
 
             if (currentTarget != null)
@@ -633,6 +511,184 @@ public class Entity : MonoBehaviour
                     currentTarget = greatestThreat;
             }
         }
+
+        void Die()
+        {
+            isDead = true;
+            animator.CrossFade("Death", 0.15f);
+
+            stats.health = 0;
+            stats.mana = 0;
+
+            // clear status effects
+            while (currentStatusEffects.Count > 0)
+                currentStatusEffects.RemoveAt(0);
+
+            // apply reward (negative) to mlAgentsController
+            //if (this is Character)
+                //mlAgentsController.GiveRewardWithTracking(MlAgentsController.REWARD_CHARACTER_DEATH, "REWARD_CHARACTER_DEATH");
+        }
+
+        float DoCriticalStrikeCalculations(float passedAmount)
+        {
+            float retVal = passedAmount;
+
+            float doCriticalStrikeProbability = damagingEntity.stats.baseCritChance
+                + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.CriticalStrikeChanceOnTarget)
+                - this.GetTotalStatusEffectModifier(StatusEffectType.CriticalStrikeChanceOnSelf);
+
+            if (UnityEngine.Random.Range((float)0, (float)1) < doCriticalStrikeProbability)
+            {
+                // critical strike! do 50% more damage after other damage modifiers have been applied
+                if (this is Dragon)
+                {
+                    string getHitAnimationName = "Get Hit";
+                    if (!lockedAnimations.Contains(getHitAnimationName))
+                    {
+                        animator.CrossFade(getHitAnimationName, 0.10f);
+                        lockedAnimations.Add(getHitAnimationName);
+                        //Debug.Log(name + ": Get Hit Animation Start");
+                        StartCoroutine(StartUnlockAnimationTimer(LOCKED_ANIMATION_TIME, getHitAnimationName));
+                    }
+                }
+                retVal *= 1.5f;
+            }
+
+            return retVal;
+        }
+
+        float DoBlockCalculations(float passedAmount)
+        {
+            float retVal = passedAmount;
+
+            float doBlockProbability = this.stats.baseBlockChance + this.GetTotalStatusEffectModifier(StatusEffectType.BlockChance);
+            float randChance = UnityEngine.Random.Range((float)0, (float)1);
+            if (randChance < doBlockProbability)
+            {
+                //Debug.Log(name + ": Blocking! ["+ randChance+"] < ["+doBlockProbability+"]");
+                string blockAnimationName = "Block";
+
+                if (this is Dragon && !lockedAnimations.Contains(blockAnimationName))
+                {
+                    animator.CrossFade(blockAnimationName, 0.10f);
+                    lockedAnimations.Add(blockAnimationName);
+                    //Debug.Log(name + ": Block Animation Start");
+                    StartCoroutine(StartUnlockAnimationTimer(LOCKED_ANIMATION_TIME, blockAnimationName));
+                }
+                else if (!(this is Dragon))
+                    animator.CrossFade(blockAnimationName, 0.10f);
+
+                // Ability was blocked, reduce damage by 50%
+                retVal *= 0.5f;
+            }
+
+            return retVal;
+        }
+
+        float GetDamageAfterAbsorption(float beforeAbsorptionDamage)
+        {
+            float retVal = beforeAbsorptionDamage;
+
+            foreach (StatusEffect statusEffect in currentStatusEffects)
+            {
+                if (statusEffect.type == StatusEffectType.DamageAbsorption)
+                {
+                    if (statusEffect.strength > retVal)
+                    {
+                        // absorbing all the remaining damage and still some left to spare
+                        statusEffect.strength -= retVal;
+                        retVal = 0;
+                        break;
+                    }
+                    else if (statusEffect.strength == retVal)
+                    {
+                        // absorbing all the remaining damage and none left to spare
+                        statusEffect.strength = 0;
+                        statusEffect.time = 0;
+                        retVal = 0;
+                        break;
+                    }
+                    else
+                    {
+                        // using all absorbtion from this effect, but not enough
+                        // will continue to try other status effects (if any) to absorb remaining damage
+                        statusEffect.strength = 0;
+                        statusEffect.time = 0;
+                        retVal -= statusEffect.strength;
+                    }
+                }
+            }
+
+            return retVal;
+        }
+
+        if (ability.damage == 0)
+            return;
+
+        if (ability.damage < 0)
+            Debug.LogWarning(name + ": TakeDamage ["+ ability.name.ToString()+"] ["+isUpdatePerSecond+"] - negative value received and will heal target, if you want to heal, you should use HealDamage instead");
+
+        // Perform hit calculations
+        float getHitProbability = damagingEntity.stats.baseHitChance
+            + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.HitChanceOnTarget)
+            - this.GetTotalStatusEffectModifier(StatusEffectType.HitChanceOnSelf);
+
+        if (UnityEngine.Random.Range((float) 0, (float) 1) >= getHitProbability && !isUpdatePerSecond)
+        {
+            return; // this ability missed.
+        }
+
+        if (!isUpdatePerSecond)
+        {
+            // Get (if any) attacking entity's attack power modifers
+            float totalAttackPowerModifier = 1f + damagingEntity.GetTotalStatusEffectModifier(StatusEffectType.AttackPower);
+            float modifiedDamageAmount = ability.damage * totalAttackPowerModifier;
+
+            // Handle special cases for each ability
+            modifiedDamageAmount += ability.HandleSpecialAbilitiesAndGetDamageModifier(damagingEntity, this);
+
+            // Check for critical strike
+            modifiedDamageAmount = DoCriticalStrikeCalculations(modifiedDamageAmount);
+
+            // Check for block
+            modifiedDamageAmount = DoBlockCalculations(modifiedDamageAmount);
+
+            // Apply reward to character
+            if (damagingEntity is Character && this is Dragon)
+            {
+                // positive reward for damaging dragon
+                Character castedCharacter = (Character)damagingEntity;
+                Dragon castedDragon = (Dragon)this;
+                castedCharacter.mlAgentsController.GiveRewardWithTracking((modifiedDamageAmount / castedDragon.stats.maxHealth) * MlAgentsController.REWARD_DRAGON_DAMAGE, "REWARD_DRAGON_DAMAGE");
+            }
+            else if (this is Character)
+            {
+                // negative reward for receiving damage
+                Character castedCharacter = (Character)this;
+                castedCharacter.mlAgentsController.GiveRewardWithTracking((modifiedDamageAmount / castedCharacter.stats.maxHealth) * MlAgentsController.REWARD_CHARACTER_DAMAGE, "REWARD_CHARACTER_DAMAGE");
+            }
+            else if (damagingEntity.name != name) // exclude DOT status effects
+                Debug.LogWarning(damagingEntity.name + " is attacking " + name + "???");
+
+            // Check for damage absorbtion from status effects
+            float damageAmountAfterAbsorption = GetDamageAfterAbsorption(modifiedDamageAmount);
+
+            // Finally, adjust the entity's health
+            stats.health -= damageAmountAfterAbsorption;
+        }
+        else
+        {
+            stats.health -= ability.damage;
+        }
+
+        if (stats.health < 0)
+        {
+            Die();
+        }
+        else if (this is PlainAI && damagingEntity != this && !isUpdatePerSecond)
+        {
+            UpdateThreatMap(ability.damage);
+        }
     }
 
     public void RestoreHealth(float amount)
@@ -642,7 +698,6 @@ public class Entity : MonoBehaviour
 
         //if (amount < 0)
             //Debug.LogWarning("(" + simulation.name + ") " + name + ": TakeDamage - negative value received and will damage target, if you want to damage, you should use TakeDamage instead");
-
 
         stats.health += amount;
         if (stats.health > stats.maxHealth)
@@ -664,6 +719,9 @@ public class Entity : MonoBehaviour
 
     public void ApplyNewStatusEffect(StatusEffect newStatusEffect)
     {
+        if (isDead)
+            return;
+
         bool alreadyExist = false;
         foreach(StatusEffect statusEffect in currentStatusEffects)
         {
@@ -671,6 +729,7 @@ public class Entity : MonoBehaviour
                 statusEffect.type == newStatusEffect.type)
             {
                 statusEffect.time = newStatusEffect.time;
+                statusEffect.strength = newStatusEffect.strength;
                 alreadyExist = true;
                 break;
             }
@@ -680,7 +739,7 @@ public class Entity : MonoBehaviour
             currentStatusEffects.Add(newStatusEffect.Clone());
     }
 
-    public void ResetStatsAndStatusEffects()
+    public virtual void ResetStatsAndStatusEffects()
     {
         while (currentStatusEffects.Count > 0)
             currentStatusEffects.RemoveAt(0);
@@ -691,7 +750,7 @@ public class Entity : MonoBehaviour
         isDead = false;
     }
 
-    public void OnDrawGizmosSelected()
+    public virtual void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, meleeRangeRadius);

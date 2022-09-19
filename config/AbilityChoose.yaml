@@ -2,24 +2,27 @@ behaviors:
   AbilityChoose:
     trainer_type: ppo
     hyperparameters:
-      batch_size: 1024
-      buffer_size: 10240
-      learning_rate: 0.0003
-      beta: 0.005
-      epsilon: 0.2
+      batch_size: 10240
+      buffer_size: 204800
+      learning_rate: 0.000005
+      beta: 0.001
+      epsilon: 0.15
       lambd: 0.95
-      num_epoch: 3
+      num_epoch: 6
       learning_rate_schedule: linear
       beta_schedule: linear
       epsilon_schedule: linear
     network_settings:
       normalize: false
-      hidden_units: 256
-      num_layers: 3
+      hidden_units: 512
+      num_layers: 2
     reward_signals:
       extrinsic:
-        gamma: 0.99
+        gamma: 0.975
         strength: 1.0
-    max_steps: 50000000
+      curiosity:
+        strength: 0.08
+        gamma: 0.975
+    max_steps: 500000000
     time_horizon: 64
-    summary_freq: 25000
+    summary_freq: 500000

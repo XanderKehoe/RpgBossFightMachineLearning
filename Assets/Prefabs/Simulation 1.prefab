@@ -86,12 +86,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 90
+    VectorObservationSize: 230
     NumStackedVectorObservations: 1
     m_ActionSpec:
-      m_NumContinuousActions: 0
+      m_NumContinuousActions: 10
       BranchSizes: 0700000007000000070000000700000005000000
-    VectorActionSize: 0700000007000000070000000700000005000000
+    VectorActionSize: 
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
     hasUpgradedBrainParametersWithActionSpec: 1
@@ -120,6 +120,7 @@ MonoBehaviour:
   hasUpgradedFromAgentParameters: 1
   MaxStep: 0
   simulation: {fileID: 8160661046930081217}
+  simulationManager: {fileID: 8160661047877759116}
   characters:
   - {fileID: 630867891056006983}
   - {fileID: 3274427828873353354}
@@ -138,7 +139,7 @@ GameObject:
   - component: {fileID: 8160661047877759119}
   - component: {fileID: 8160661047877759116}
   m_Layer: 0
-  m_Name: GameManager
+  m_Name: SimulationManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -152,7 +153,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8160661047877759117}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 39.63826, y: -10.499419, z: -3.731266}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -180,6 +181,8 @@ MonoBehaviour:
   - {fileID: 473244394664710838}
   dragon: {fileID: 8769637828168492862}
   mlAgentsController: {fileID: 8160661047483186347}
+  terrain: {fileID: 8160661048157101531}
+  MAP_BORDER_SIZE: 23.5
 --- !u!1 &8160661048157101529
 GameObject:
   m_ObjectHideFlags: 0
@@ -282,9 +285,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 8115361682353345875, guid: 8c55cf0aacc1c654bb45dbca18aa4cb7, type: 3}
+      propertyPath: stats.health
+      value: 100000
+      objectReference: {fileID: 0}
+    - target: {fileID: 8115361682353345875, guid: 8c55cf0aacc1c654bb45dbca18aa4cb7, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 630867891056006983}
+    - target: {fileID: 8115361682353345875, guid: 8c55cf0aacc1c654bb45dbca18aa4cb7, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 8115361682353345875, guid: 8c55cf0aacc1c654bb45dbca18aa4cb7, type: 3}
       propertyPath: mlAgentsController
       value: 
@@ -396,6 +407,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 1174142302414279757, guid: 474da9cf6d7e2d4489dbfddca2ede667, type: 3}
+      propertyPath: stats.health
+      value: 350
+      objectReference: {fileID: 0}
+    - target: {fileID: 1174142302414279757, guid: 474da9cf6d7e2d4489dbfddca2ede667, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 8769637828168492862}
@@ -403,6 +418,10 @@ PrefabInstance:
       propertyPath: abilityChooser
       value: 
       objectReference: {fileID: 8160661047483186347}
+    - target: {fileID: 1174142302414279757, guid: 474da9cf6d7e2d4489dbfddca2ede667, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 1174142302414279757, guid: 474da9cf6d7e2d4489dbfddca2ede667, type: 3}
       propertyPath: mlAgentsController
       value: 
@@ -570,6 +589,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 7643595333746280922, guid: 18a7ad6c5a6c2dd40b46e7716c0436bd, type: 3}
+      propertyPath: stats.health
+      value: 125
+      objectReference: {fileID: 0}
+    - target: {fileID: 7643595333746280922, guid: 18a7ad6c5a6c2dd40b46e7716c0436bd, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 8769637828168492862}
@@ -577,6 +600,10 @@ PrefabInstance:
       propertyPath: abilityChooser
       value: 
       objectReference: {fileID: 8160661047483186347}
+    - target: {fileID: 7643595333746280922, guid: 18a7ad6c5a6c2dd40b46e7716c0436bd, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 7643595333746280922, guid: 18a7ad6c5a6c2dd40b46e7716c0436bd, type: 3}
       propertyPath: mlAgentsController
       value: 
@@ -636,6 +663,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 3557084079861295749, guid: 936ce59f5cd876c4e8a1692c6d9446a6, type: 3}
+      propertyPath: stats.health
+      value: 150
+      objectReference: {fileID: 0}
+    - target: {fileID: 3557084079861295749, guid: 936ce59f5cd876c4e8a1692c6d9446a6, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 8769637828168492862}
@@ -643,6 +674,10 @@ PrefabInstance:
       propertyPath: abilityChooser
       value: 
       objectReference: {fileID: 8160661047483186347}
+    - target: {fileID: 3557084079861295749, guid: 936ce59f5cd876c4e8a1692c6d9446a6, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 3557084079861295749, guid: 936ce59f5cd876c4e8a1692c6d9446a6, type: 3}
       propertyPath: mlAgentsController
       value: 
@@ -774,6 +809,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 6643204444179090991, guid: 5d4a9d974399a5344b1d1907304fab33, type: 3}
+      propertyPath: stats.health
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 6643204444179090991, guid: 5d4a9d974399a5344b1d1907304fab33, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 8769637828168492862}
@@ -781,6 +820,10 @@ PrefabInstance:
       propertyPath: abilityChooser
       value: 
       objectReference: {fileID: 8160661047483186347}
+    - target: {fileID: 6643204444179090991, guid: 5d4a9d974399a5344b1d1907304fab33, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 6643204444179090991, guid: 5d4a9d974399a5344b1d1907304fab33, type: 3}
       propertyPath: mlAgentsController
       value: 
@@ -960,6 +1003,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 8633735533755906952, guid: 3f14accb42054d44fa15bc9ab22ef699, type: 3}
+      propertyPath: stats.health
+      value: 125
+      objectReference: {fileID: 0}
+    - target: {fileID: 8633735533755906952, guid: 3f14accb42054d44fa15bc9ab22ef699, type: 3}
       propertyPath: currentTarget
       value: 
       objectReference: {fileID: 8769637828168492862}
@@ -967,6 +1014,10 @@ PrefabInstance:
       propertyPath: abilityChooser
       value: 
       objectReference: {fileID: 8160661047483186347}
+    - target: {fileID: 8633735533755906952, guid: 3f14accb42054d44fa15bc9ab22ef699, type: 3}
+      propertyPath: simulationManager
+      value: 
+      objectReference: {fileID: 8160661047877759116}
     - target: {fileID: 8633735533755906952, guid: 3f14accb42054d44fa15bc9ab22ef699, type: 3}
       propertyPath: mlAgentsController
       value: 

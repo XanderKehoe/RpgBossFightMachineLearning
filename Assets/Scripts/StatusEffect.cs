@@ -24,7 +24,14 @@ public enum StatusEffectTarget
     Self,
     SelectedTarget,
     AllFriendlies,
-    AllEnemies
+    AllEnemies,
+    AreaOfEffect, // applies only to entities within a specific area, to be decided by each ability
+}
+
+public enum AreaOfEffectType
+{
+    Cone,
+    Circle
 }
 
 [System.Serializable]

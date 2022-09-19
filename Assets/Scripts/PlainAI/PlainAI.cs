@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlainAI : Entity
 {
-    private List<AbilityName> onCooldownList = new ();
+    private HashSet<AbilityName> onCooldownList = new ();
     [SerializeField] public Dictionary<Entity, float> threatMap = new();
 
     protected override void MakeCombatDecision()
@@ -18,13 +18,17 @@ public class PlainAI : Entity
             }
 
             // For now, just selected a random ability not on cooldown
-            Ability randAbility;
-            while (true)
+            Ability randAbility = null;
+            bool foundAbility = false;
+            while (!foundAbility)
             {
                 randAbility = abilities[Random.Range(0, abilities.Count)];
+                //Debug.Log(name + ": Randomly trying: " + randAbility.name.ToString());
                 if (!onCooldownList.Contains(randAbility.name))
-                    break;
+                    foundAbility = true;
             }
+
+            //Debug.Log(name + ": Randomly chose: " + randAbility.name.ToString());
 
             if (!(randAbility is PlainAiAbility))
             {
@@ -34,19 +38,20 @@ public class PlainAI : Entity
 
             PlainAiAbility castedRandAbility = (PlainAiAbility)randAbility;
 
-            SetAbilityCooldown(castedRandAbility.name, castedRandAbility.cooldownTime);
-
-            if (IsAbilityInRange(currentTarget, randAbility.range))
+            if (IsAbilityInRange(currentTarget, castedRandAbility.range))
             {
                 navMeshAgent.isStopped = true;
+                //Debug.Log(name + ": isStopped = true");
 
-                CastAbility(currentTarget, randAbility);
+                CastAbility(currentTarget, castedRandAbility);
+                SetAbilityCooldown(castedRandAbility.name, castedRandAbility.cooldownTime);
+
+                //Debug.Log(name + ": MakeCombatDecision() - Casted [" + castedRandAbility.name.ToString() + "]");
             }
             else
             {
                 navMeshAgent.isStopped = false;
-                navMeshAgent.SetDestination(currentTarget.transform.position
-                    + (Vector3.Normalize(transform.position - currentTarget.transform.position) * currentTarget.meleeRangeRadius));
+                //Debug.Log(name + ": isStopped = false");
             }
         }
     }
@@ -57,7 +62,7 @@ public class PlainAI : Entity
         {
             onCooldownList.Add(abilityName);
 
-            StartAbilityCooldownTimer(abilityName, cooldownTime);
+            StartCoroutine(StartAbilityCooldownTimer(abilityName, cooldownTime));
         }
     }
 
@@ -65,6 +70,31 @@ public class PlainAI : Entity
     {
         yield return new WaitForSeconds(time);
 
+        //Debug.Log(name + " Removed [" + abilityName.ToString() + "] off cooldown");
         onCooldownList.Remove(abilityName);
+    }
+
+    public override void ResetStatsAndStatusEffects()
+    {
+        base.ResetStatsAndStatusEffects();
+
+        StopAllCoroutines(); // stop coroutines from previous episodes.
+
+        ResetGlobalCooldownTimer();
+
+        onCooldownList.Clear();
+
+        // set boss to initially have all cooldowns on max
+        foreach (PlainAiAbility ability in abilities)
+        {
+            if (ability.name != AbilityName.BASIC_ATTACK)
+                SetAbilityCooldown(ability.name, ability.cooldownTime);
+        }
+    }
+
+    public void AddToThreatMap(Entity entity) 
+    {
+        if (!threatMap.ContainsKey(entity))
+            threatMap.Add(entity, 0);
     }
 }

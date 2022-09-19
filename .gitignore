@@ -12,4 +12,9 @@ Packages/*
 obj/*
 Logs/*
 Library/*
+results/*
+Build/*
+DataTextOutput/*
+WoWBossFightMlNotes.txt
+WoWBossFightMlPositionalLearningNotes.txt
 
