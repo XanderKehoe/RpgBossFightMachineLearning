@@ -32,8 +32,8 @@ public class MlAgentsController : Agent
     private double lastDecisionTime = 0;
     private const int INVALID_CHARACTER_INDEX = -1;
 
-    private Dictionary<string, float> totalPosRewards = new Dictionary<string, float>();
-    private Dictionary<string, float> totalNegRewards = new Dictionary<string, float>();
+    private Dictionary<string, float> totalPosRewards = new Dictionary<string, float>(); // used for debugging to track how rewards are given.
+    private Dictionary<string, float> totalNegRewards = new Dictionary<string, float>(); // used for debugging to track how rewards are given.
 
     public void Start()
     {
@@ -262,6 +262,7 @@ public class MlAgentsController : Agent
                 totalNegReward += kvp.Value;
             }
 
+            /* // used for debugging to track how rewards are given.
             Debug.Log("END OF EPISODE, PRINTING REWARDS...");
             foreach (KeyValuePair<string, float> kvp in totalPosRewards)
             {
@@ -271,7 +272,7 @@ public class MlAgentsController : Agent
             foreach (KeyValuePair<string, float> kvp in totalNegRewards)
             {
                 Debug.Log("\t" + kvp.Key + "(-): " + kvp.Value + " (" + ((kvp.Value / totalNegReward) * 100)+"%)");
-            }
+            }*/
 
             totalPosRewards.Clear();
             totalNegRewards.Clear();
@@ -356,6 +357,7 @@ public class MlAgentsController : Agent
     {
         AddReward(val);
 
+        // used for debugging to track how rewards are given.
         if (val >= 0)
         {
             if (totalPosRewards.ContainsKey(str))
@@ -364,7 +366,7 @@ public class MlAgentsController : Agent
             }
             else
             {
-                Debug.Log("Adding new positive reward: " + str);
+                //Debug.Log("Adding new positive reward: " + str);
                 totalPosRewards.Add(str, val);
             }
         }
@@ -376,7 +378,7 @@ public class MlAgentsController : Agent
             }
             else
             {
-                Debug.Log("Adding new positive reward: " + str);
+                //Debug.Log("Adding new positive reward: " + str);
                 totalNegRewards.Add(str, val * -1);
             }
         }

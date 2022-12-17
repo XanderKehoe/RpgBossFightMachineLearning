@@ -38,9 +38,7 @@ public abstract class Character : Entity
         if (currentTarget != null)
         {
             // In future
-            // Determine if/where we should move
-            // Determine target
-            // Determine ability
+            // Determine target (if multiple)
 
             MakeCombatMovementDecision();
 
@@ -64,8 +62,6 @@ public abstract class Character : Entity
 
             if (IsAbilityInRange(currentTarget, selectedAbility.range))
             {
-                //navMeshAgent.isStopped = true; //(to be removed once movement decisions are figured out)
-
                 //Debug.Log(name + " was in range, reward is: " + MlAgentsController.REWARD_CAST_ABILITY_WITHIN_RANGE);
                 mlAgentsController.GiveRewardWithTracking(MlAgentsController.REWARD_CAST_ABILITY_WITHIN_RANGE, "REWARD_CAST_ABILITY_WITHIN_RANGE"); // reward agent for casting ability within range
 
@@ -94,12 +90,6 @@ public abstract class Character : Entity
                 mlAgentsController.GiveRewardWithTracking(reward, "REWARD_CAST_ABILITY_OUTSIDE_OF_RANGE");
                 //Debug.Log(name + ": not in range, reward is: " + reward);
             }
-            /*else // automatically get in target range (to be removed once movement decisions are figured out)
-            {
-                navMeshAgent.isStopped = false;
-                navMeshAgent.SetDestination(currentTarget.transform.position
-                    + (Vector3.Normalize(transform.position - currentTarget.transform.position) * currentTarget.meleeRangeRadius));
-            } */
         }
     }
 

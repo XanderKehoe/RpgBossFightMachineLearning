@@ -26,6 +26,8 @@ public class SimulationManager : MonoBehaviour
     private const int EXPECTED_CHARACTER_COUNT = 5;
     public float MAP_BORDER_SIZE = 10; // Treat as constant, but not actually set as one to make it easier to adjust in editor.
 
+    public AbilityUseTracker abilityUseTracker = new();
+
     // Start is called before the first frame update
     public void Start()
     {
@@ -79,6 +81,8 @@ public class SimulationManager : MonoBehaviour
 
         if (anyDead)
         {
+            abilityUseTracker.PrintData();
+
             mlAgentsController.GiveRewardWithTracking(MlAgentsController.REWARD_CHARACTER_DEATH, "REWARD_CHARACTER_DEATH");
             mlAgentsController.EndEpisode();
 
@@ -87,6 +91,8 @@ public class SimulationManager : MonoBehaviour
         }
         else if (mlAgentsController.dragon.isDead)
         {
+            abilityUseTracker.PrintData();
+
             // Calculate finalReward based upon defined reward & how fast they defeated the dragon.
             float finalReward = MlAgentsController.REWARD_KILL_BOSS / ((float) (mlAgentsController.StepCount) / (float) (2000));
 

@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1102986900881505938}
   m_Layer: 0
-  m_Name: PS_Fireball
+  m_Name: PS_MagicBolt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -449,6 +449,8 @@ public abstract class Entity : MonoBehaviour
             }
         }
 
+        simulationManager.abilityUseTracker.AddAbilityUse(this, ability.name);
+
         // check mana cost and update it.
         if (ability is CharacterAbility)
         {
